@@ -6,7 +6,8 @@ import {
   updateStudent,
   getStudentGrades,
   getStudentCourses,
-  enrollInCourse
+  enrollInCourse,
+  deleteStudent
 } from '../Controller/StudentController';
 
 const studentsRouter = express.Router();
@@ -18,5 +19,5 @@ studentsRouter.put('/:id', updateStudent);
 studentsRouter.get('/:id/grades', getStudentGrades);
 studentsRouter.get('/:id/courses', getStudentCourses);
 studentsRouter.post('/:id/enroll', enrollInCourse);
-
+studentsRouter.delete('/:id',deleteStudent)
 export default studentsRouter;

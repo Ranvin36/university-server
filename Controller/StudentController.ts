@@ -80,18 +80,24 @@ export const enrollInCourse = async (req: Request, res: Response) => {
     const student = await Student.findById(req.params.id);
     const course = await Course.findById(courseId);
     if (!student || !course) return res.status(404).json({ message: 'Student or Course not found' });
-
+    
     // Check if already enrolled
-    if (student.courses.includes(courseId)) {
+    if (student.enrolledCourses.includes(courseId)) {
       return res.status(400).json({ message: 'Already enrolled in this course' });
     }
-    // Check course capacity
-    if (course.students.length >= course.capacity) {
-      return res.status(400).json({ message: 'Course is full' });
+    
+    const enrollCourse = {
+      courseId,
+      courseName:course.title
     }
 
-    student.courses.push(courseId);
-    course.students.push(student._id);
+    const enrollStudent = {
+      studentId:student._id, 
+      studentName:student.name
+    }
+
+    student.enrolledCourses.push(enrollCourse);
+    course.students.push(enrollStudent);
 
     await student.save();
     await course.save();
@@ -126,4 +132,15 @@ export const removeFromCourse = async (req: Request, res: Response) => {
   } catch (err) {
     res.status(400).json({ message: err });
   }
+};
+
+// DELETE /:id - Delete course 
+export const deleteStudent = async (req: Request, res: Response) => {
+    try {
+        const deleted = await Student.findByIdAndDelete(req.params.id);
+        if (!deleted) return res.status(404).json({ message: `Student With Id:${req.params.id} Not Found!` });
+        res.status(200).json({ message: "Student deleted successfully." });
+    } catch (error) {
+        res.status(501).json({ message: error });
+    }
 };
