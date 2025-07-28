@@ -56,7 +56,6 @@ export const addCourseToInstructor = async (req: Request, res: Response) => {
     if (instructor.coursesTaught.some((c: any) => c.courseId === courseId)) {
       return res.status(400).json({ message: 'Course already assigned to instructor' });
     }
-
     instructor.coursesTaught.push({ courseId, courseName });
     await instructor.save();
     res.json({ message: 'Course added to instructor', coursesTaught: instructor.coursesTaught });
