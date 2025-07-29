@@ -3,6 +3,7 @@ import Payment from '../Schemas/payment';
 
 // POST /payments - Make a payment
 export const makePayment = async (req: Request, res: Response) => {
+  console.log("Processing payment request:");
   try {
     const payment = new Payment(req.body);
     await payment.save();

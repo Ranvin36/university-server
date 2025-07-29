@@ -1,6 +1,17 @@
 import { Request, Response } from 'express';
 import Instructor from '../Schemas/instructor';
 
+// GET /instructors- Get all instructors 
+export const getInstructors = async (req: Request, res: Response) => {
+  try {
+    const instructor = await Instructor.find();
+    if (!instructor) return res.status(404).json({ message: 'No Instructors found' });
+    res.status(200).json(instructor);
+  } catch (err) {
+    res.status(500).json({ message: err });
+  }
+};
+
 // GET /instructors/:id - Get instructor profile
 export const getInstructorById = async (req: Request, res: Response) => {
   try {
