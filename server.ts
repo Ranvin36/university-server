@@ -7,48 +7,22 @@ import courseRouter from './Routes/CourseRouter';
 import instructorRouter from './Routes/InstructorRoutes';
 import gradesRouter from './Routes/GradesRoutes';
 import paymentRouter from './Routes/PaymentRoutes';
+import cors from 'cors'
+import authRouter from './Routes/AuthRouter';
+
 const app = express();
 const server = http.createServer(app);
 connectDatabase()
 dotenv.config()
 
 
-import axios from 'axios';
-
-const getToken = async () => {
-  const clientId = process.env.clientId!;
-  const clientSecret = process.env.clientSecret!;
-  const username = 'admin';
-  const password = 'admin';
-
-  const params = new URLSearchParams();
-  params.append('grant_type', 'password');
-  params.append('username', username);
-  params.append('password', password);
-  params.append('scope', 'PRODUCTION');
-
-  const response = await axios.post('https://localhost:9443/oauth2/token', params, {
-    auth: {
-      username: clientId,
-      password: clientSecret,
-    },
-    httpsAgent: new (require('https').Agent)({ rejectUnauthorized: false }),
-    headers: {
-      'Content-Type': 'application/x-www-form-urlencoded',
-    },
-  });
-
-  console.log('Access Token:', response.data.access_token);
-  return response.data.access_token;
+const corsOptions = {
+  origin: '*', 
 };
 
-
+app.use(cors(corsOptions));
 app.use(express.json());
-app.post('/university/v1/api/login', async(req, res) => {
-    console.log("Login endpoint hitted");
-    const token = await getToken()
-    res.json({ message: "Login endpoint is under construction" , token: token });
-})
+app.use('/university/v1/api/auth',authRouter)
 app.use('/university/v1/api/students', studentsRouter);
 app.use('/university/v1/api/courses', courseRouter);
 app.use('/university/v1/api/instructors', instructorRouter);

@@ -1,6 +1,10 @@
 const mongoose = require("mongoose");
 
 const instructorSchema = mongoose.Schema({
+    id:{
+        type: mongoose.Schema.Types.ObjectId,
+        required: true,
+    },
     name: {
         type: String,
         required: true
@@ -19,24 +23,33 @@ const instructorSchema = mongoose.Schema({
 
 
 const studentsSchema = mongoose.Schema({
-    studentId: {
+    id: {
+        type: mongoose.Schema.Types.ObjectId, 
+        required: true
+    },
+    name: {
         type: String,
         required: true
     },
-    studentName: {
+    email: {
         type: String,
-        required: true
+        required: true,
+        unique: true        
+    },
+    phoneNumber: {  
+        type: Number,
+        required: true,
+        unique: true
     }
 })
 
 
 const CourseSchema = mongoose.Schema({
-    id: {
-        type: String,
-        required: true,
-        unique: true
-    },
     title: {
+        type: String,
+        required: true
+    },
+    description:{
         type: String,
         required: true
     },
@@ -44,6 +57,10 @@ const CourseSchema = mongoose.Schema({
         type: String,
         required: true,
         unique: true
+    },
+    department: {
+        type: String,
+        required: true
     },
     credits: {
         type: Number,

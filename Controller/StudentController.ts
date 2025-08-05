@@ -10,6 +10,7 @@ export const getStudents = async (req: Request, res: Response) => {
     if (!student) return res.status(404).json({ message: 'No Students Found' });
     res.json(student);
   } catch (err) {
+    console.log(err)
     res.status(500).json({ message: err });
   }
 };
@@ -24,21 +25,75 @@ export const getStudentById = async (req: Request, res: Response) => {
   }
 };
 
+export const searchStudents = async(req:Request,res:Response) => {
+  try{
+    const search = req.query.search || "";
+    const student = await Student.find(
+     { name: { $regex: search, $options: "i" }
+    })
+    res.status(200).json(student)
+  }
+  catch(err){
+    res.status(500).json({message:err})
+  }
+}
+
 // POST / - Register new student
 export const registerStudent = async (req: Request, res: Response) => {
   try {
-    const findStudent = await Student.find({email:req.body.email});
-    console.log(findStudent + " " + req.body.email);
-    if (findStudent.length === 0) {
-      const student = new Student(req.body);
-      await student.save();
-      return res.status(201).json(student);
+    console.log("REGISTER STUDENT", req.body)
+    const existingStudent = await Student.findOne({ email: req.body.email });
+    if (existingStudent) {
+      return res.status(409).json({ message: 'Student already exists' });
     }
-    return res.status(404).json({ message: 'Student Already Exists' });
+    const student = new Student(req.body);
+    const uniqueCoursesMap = new Map();
+
+    // Step 1: De-duplicate courses by courseId
+    for (const course of req.body.enrolledCourses) {
+      uniqueCoursesMap.set(course.courseId, course); // keeps only one entry per courseId
+    }
+
+    const uniqueCourses = Array.from(uniqueCoursesMap.values());
+
+    for (const course of uniqueCourses) {
+      const courseModel = await Course.findById(course.courseId);
+      if (!courseModel) {
+        return res.status(404).json({ message: `Course with ID ${course.courseId} not found` });
+      }
+
+      // Check if student already exists in course
+      const alreadyAdded = courseModel.students.find((s:any) => String(s.id) === String(student._id));
+      if (!alreadyAdded) {
+        courseModel.students.push({
+          id: student._id,
+          name: student.name,
+          email:student.email,
+          phoneNumber:student.phoneNumber
+        });
+        await courseModel.save();
+      }
+
+      // Check if course is already in student's enrolledCourses (optional if deduped earlier)
+      const alreadyEnrolled = student.enrolledCourses.find(
+        (c:any) => String(c.courseId) === String(course.courseId)
+      );
+      if (!alreadyEnrolled) {
+        student.enrolledCourses.push({
+          courseId: course.courseId,
+          courseName: course.courseName,
+        });
+        await student.save();
+      }
+    }
+    await student.save();
+    return res.status(201).json(student);
   } catch (err) {
-    res.status(400).json({ message: err });
+    console.error("Register error:", err);
+    res.status(500).json({ message: "Something went wrong", error: err });
   }
 };
+
 
 // PUT /students/:id - Update profile
 export const updateStudent = async (req: Request, res: Response) => {
@@ -76,30 +131,39 @@ export const getStudentCourses = async (req: Request, res: Response) => {
 // POST /students/:id/enroll - Enroll in a course
 export const enrollInCourse = async (req: Request, res: Response) => {
   try {
-    const { courseId } = req.body;
-    const student = await Student.findById(req.params.id);
-    const course = await Course.findById(courseId);
-    if (!student || !course) return res.status(404).json({ message: 'Student or Course not found' });
-    
-    // Check if already enrolled
-    if (student.enrolledCourses.includes(courseId)) {
-      return res.status(400).json({ message: 'Already enrolled in this course' });
-    }
+    const { id } = req.params;
+    const { students } = req.body;
+    console.log(id,students)  
+    const course = await Course.findById(id);
     
     const enrollCourse = {
-      courseId,
+      courseId:id,
       courseName:course.title
     }
+    
+    for(const std of students){
+      const studentId = std.id;
+      console.log(studentId)
+      const student = await Student.findById(studentId);    
+      if (!student || !course) return res.status(404).json({ message: 'Student or Course not found' });
+      
+      // Check if already enrolled
+      const alreadyEnrolled = student.enrolledCourses.find((c: any) => String(c.courseId) === String(id));
+      if (alreadyEnrolled) {
+        continue; 
+      }
 
-    const enrollStudent = {
-      studentId:student._id, 
-      studentName:student.name
+      const enrollStudent = {
+        id:student._id, 
+        name:student.name,
+        email:student.email,
+        phoneNumber:student.phoneNumber
+      }
+      
+      student.enrolledCourses.push(enrollCourse);
+      course.students.push(enrollStudent);
+      await student.save();
     }
-
-    student.enrolledCourses.push(enrollCourse);
-    course.students.push(enrollStudent);
-
-    await student.save();
     await course.save();
 
     res.json({ message: 'Enrolled successfully' });
@@ -118,13 +182,13 @@ export const removeFromCourse = async (req: Request, res: Response) => {
 
     // Remove course from student's enrolledCourses
     student.enrolledCourses = student.enrolledCourses.filter(
-      (c: any) => c.courseId !== courseId
+      (c: any) => c.courseId != courseId
     );
     await student.save();
 
     // Remove student from course's students
     course.students = course.students.filter(
-      (s: any) => s.studentId !== student._id.toString()
+      (s: any) => String(s.id) != String(student._id)
     );
     await course.save();
 
@@ -143,4 +207,41 @@ export const deleteStudent = async (req: Request, res: Response) => {
     } catch (error) {
         res.status(501).json({ message: error });
     }
+};
+
+export const getUnpaidStudents = async (req:Request, res:Response) => {
+  try {
+    const unpaidStudents = await Student.find({
+      $or: [
+        { payments: { $eq: [] } },
+        { payments: { $not: { $elemMatch: { status: 'paid' } } } }
+      ]
+    });
+
+    res.json(unpaidStudents);
+  } catch (err) {
+    res.status(500).json({ error: err });
+  }
+};
+
+// controllers/studentController.js
+export const createPayment = async (req:Request, res:Response) => {
+  try {
+    const studentId = req.params.id;
+    const { amount, description } = req.body; 
+
+    const student = await Student.findById(studentId);
+    if (!student) return res.status(404).json({ message: "Student not found" });
+
+    student.payments.push({
+      amount,
+      status:'paid',
+      description
+    });
+
+    await student.save();
+    res.status(201).json({ message: "Payment added", student });
+  } catch (err) {
+    res.status(500).json({ error: err });
+  }
 };
