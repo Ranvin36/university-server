@@ -4,7 +4,6 @@ dotenv.config()
 
 const uri = `mongodb+srv://ranvin789:${process.env.DB_PASSWORD}@cluster0.sxk5t1w.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0`;
 const mongoDb = async() =>{
-    console.log(uri)
     try{
         mongoose.connect(uri)
         console.log("Database Connected Successfully")
