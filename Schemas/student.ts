@@ -2,7 +2,7 @@ const mongoose = require("mongoose");
 
 const enrolledCourses = mongoose.Schema({
     courseId: {
-        type: String,
+        type: mongoose.Schema.Types.ObjectId, 
         required: true,
     },
     courseName: {
@@ -21,6 +21,19 @@ const gradesSchema = mongoose.Schema({
         default: 0
     },
 })
+
+const paymentSchema = mongoose.Schema({
+  amount: Number,
+  date: {
+    type: Date,
+    default: Date.now,
+  },
+  status: {
+    type: String,
+    enum: ['paid', 'pending', 'failed'],
+    default: 'pending',
+  },
+});
 
 const Student = mongoose.Schema({
     name: {
@@ -47,6 +60,7 @@ const Student = mongoose.Schema({
     },
     enrolledCourses: [enrolledCourses],
     grades: [gradesSchema],
+    payments:[paymentSchema],
     createdAt: {
         type: Date,
         default: Date.now

@@ -4,7 +4,6 @@ const courseSchema = mongoose.Schema({
     courseId: {
         type: String,
         required: true,
-        unique: true
     },
     courseName: {       
         type: String,

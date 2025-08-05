@@ -1,146 +1,178 @@
 import { Request, Response } from 'express';
+import { StudentService } from '../Services/StudentService';
 import Student from '../Schemas/student';
 import Course from '../Schemas/course';
-import Grade from '../Schemas/grades';
 
-// GET /- Get all student profile
+const studentService = new StudentService();
+
+// GET / - Get all students
 export const getStudents = async (req: Request, res: Response) => {
   try {
-    const student = await Student.find();
-    if (!student) return res.status(404).json({ message: 'No Students Found' });
-    res.json(student);
+    const students = await studentService.getAllStudents();
+    if (students.length === 0) {
+      return res.status(404).json({ message: 'No students found' });
+    }
+    res.status(200).json(students);
   } catch (err) {
-    res.status(500).json({ message: err });
+    console.error('Students error:', err);
+    res.status(500).json({ message: 'Internal server error' });
   }
 };
-// GET /students/:id - Get student profile
+
+// GET /:id - Get student by ID
 export const getStudentById = async (req: Request, res: Response) => {
   try {
-    const student = await Student.findById(req.params.id);
-    if (!student) return res.status(404).json({ message: 'Student not found' });
-    res.json(student);
+    const student = await studentService.getStudentById(req.params.id);
+    if (!student) {
+      return res.status(404).json({ message: 'Student not found' });
+    }
+    res.status(200).json(student);
   } catch (err) {
-    res.status(500).json({ message: err });
+    console.error('Student error:', err);
+    res.status(500).json({ message: 'Internal server error' });
+  }
+};
+
+// GET /search - Search students
+export const searchStudents = async (req: Request, res: Response) => {
+  try {
+    const search = req.query.search || '';
+    const students = await Student.find({
+      name: { $regex: search, $options: 'i' }
+    });
+    res.status(200).json(students);
+  } catch (err) {
+    console.error('Search error:', err);
+    res.status(500).json({ message: 'Internal server error' });
   }
 };
 
 // POST / - Register new student
 export const registerStudent = async (req: Request, res: Response) => {
   try {
-    const findStudent = await Student.find({email:req.body.email});
-    console.log(findStudent + " " + req.body.email);
-    if (findStudent.length === 0) {
-      const student = new Student(req.body);
-      await student.save();
-      return res.status(201).json(student);
-    }
-    return res.status(404).json({ message: 'Student Already Exists' });
+    console.log(req?.body)
+    const student = await studentService.registerStudent(req.body);
+    res.status(201).json(student);
   } catch (err) {
-    res.status(400).json({ message: err });
+    console.error('Registration error:', err);
+    res.status(500).json({ message: 'Internal server error' });
   }
 };
 
-// PUT /students/:id - Update profile
+// PUT /:id - Update student
 export const updateStudent = async (req: Request, res: Response) => {
   try {
-    const student = await Student.findByIdAndUpdate(req.params.id, req.body, { new: true });
-    if (!student) return res.status(404).json({ message: 'Student not found' });
-    res.json(student);
+    const updated = await studentService.updateStudent(req.params.id, req.body);
+    if (!updated) {
+      return res.status(404).json({ message: 'Student not found' });
+    }
+    res.status(200).json(updated);
   } catch (err) {
-    res.status(400).json({ message: err });
+    console.error('Update error:', err);
+    res.status(500).json({ message: 'Internal server error' });
   }
 };
 
-// GET /students/:id/grades - Get student grades
-export const getStudentGrades = async (req: Request, res: Response) => {
-  try {
-    const grades = await Grade.find({ studentId: req.params.id });
-    res.json(grades);
-  } catch (err) {
-    res.status(500).json({ message: err });
-  }
-};
-
-// GET /students/:id/courses - Get enrolled courses
+// GET /:id/courses - Get student's courses
 export const getStudentCourses = async (req: Request, res: Response) => {
   try {
-    const student = await Student.findById(req.params.id);
-    if (!student) return res.status(404).json({ message: 'Student not found' });
-    const courses = await Course.find({ _id: { $in: student.courses } });
-    res.json(courses);
+    const courses = await studentService.getStudentCourses(req.params.id);
+    res.status(200).json(courses);
   } catch (err) {
-    res.status(500).json({ message: err });
+    console.error('Courses error:', err);
+    res.status(500).json({ message: 'Internal server error' });
   }
 };
 
-// POST /students/:id/enroll - Enroll in a course
+// POST /:id/enroll - Enroll in course
 export const enrollInCourse = async (req: Request, res: Response) => {
   try {
-    const { courseId } = req.body;
-    const student = await Student.findById(req.params.id);
-    const course = await Course.findById(courseId);
-    if (!student || !course) return res.status(404).json({ message: 'Student or Course not found' });
-    
-    // Check if already enrolled
-    if (student.enrolledCourses.includes(courseId)) {
-      return res.status(400).json({ message: 'Already enrolled in this course' });
-    }
-    
-    const enrollCourse = {
-      courseId,
-      courseName:course.title
+    const { id: courseId } = req.params;
+    const { students } = req.body;
+
+    if (!Array.isArray(students) || students.length === 0) {
+      return res.status(400).json({ message: "Students list is required" });
     }
 
-    const enrollStudent = {
-      studentId:student._id, 
-      studentName:student.name
-    }
-
-    student.enrolledCourses.push(enrollCourse);
-    course.students.push(enrollStudent);
-
-    await student.save();
-    await course.save();
-
-    res.json({ message: 'Enrolled successfully' });
+    const result = await studentService.enrollInCourse(courseId, students);
+    res.status(200).json(result);
   } catch (err) {
-    res.status(400).json({ message: err });
+    console.error("Enrollment error:", err);
+    res.status(500).json({ message: "Internal server error" });
   }
 };
 
-// POST /students/:id/remove-course - Remove student from a course
+// POST /:id/remove-course - Remove from course
 export const removeFromCourse = async (req: Request, res: Response) => {
   try {
-    const { courseId } = req.body;
-    const student = await Student.findById(req.params.id);
-    const course = await Course.findById(courseId);
-    if (!student || !course) return res.status(404).json({ message: 'Student or Course not found' });
-
-    // Remove course from student's enrolledCourses
-    student.enrolledCourses = student.enrolledCourses.filter(
-      (c: any) => c.courseId !== courseId
-    );
-    await student.save();
-
-    // Remove student from course's students
-    course.students = course.students.filter(
-      (s: any) => s.studentId !== student._id.toString()
-    );
-    await course.save();
-
-    res.json({ message: 'Removed from course successfully' });
+    const student = await studentService.removeFromCourse(req.params.id, req.body.courseId);
+    res.status(200).json(student);
   } catch (err) {
-    res.status(400).json({ message: err });
+    console.error('Removal error:', err);
+    res.status(500).json({ message: 'Internal server error' });
   }
 };
 
-// DELETE /:id - Delete course 
+// DELETE /:id - Delete student
 export const deleteStudent = async (req: Request, res: Response) => {
-    try {
-        const deleted = await Student.findByIdAndDelete(req.params.id);
-        if (!deleted) return res.status(404).json({ message: `Student With Id:${req.params.id} Not Found!` });
-        res.status(200).json({ message: "Student deleted successfully." });
-    } catch (error) {
-        res.status(501).json({ message: error });
+  try {
+    const deleted = await Student.findByIdAndDelete(req.params.id);
+    if (!deleted) {
+      return res.status(404).json({ message: `Student With Id:${req.params.id} Not Found!` });
     }
+    res.status(200).json({ message: "Student deleted successfully." });
+  } catch (error) {
+    console.error('Delete error:', error);
+    res.status(500).json({ message: 'Internal server error' });
+  }
+};
+
+export const getUnpaidStudents = async (req:Request, res:Response) => {
+  console.log("Inside")
+  try {
+    const unpaidStudents = await Student.find({
+      $or: [
+        { payments: { $eq: [] } },
+        { 'payments.status': 'unpaid' }
+      ]
+    });
+    
+
+    res.json(unpaidStudents);
+  } catch (err) {
+    res.status(500).json({ error: err });
+  }
+};
+
+// GET /total-payments - Get total payments
+export const getTotalPayments = async (req: Request, res: Response) => {
+  try {
+    const total = await studentService.getTotalPayments();
+    res.status(200).json({ totalAmount: total });
+  } catch (err) {
+    console.error('Total payments error:', err);
+    res.status(500).json({ error: 'Failed to calculate total payments' });
+  }
+};
+
+// controllers/studentController.js
+export const createPayment = async (req:Request, res:Response) => {
+  try {
+    const studentId = req.params.id;
+    const { amount, description } = req.body; 
+
+    const student = await Student.findById(studentId);
+    if (!student) return res.status(404).json({ message: "Student not found" });
+
+    student.payments.push({
+      amount,
+      status:'paid',
+      description
+    });
+
+    await student.save();
+    res.status(201).json({ message: "Payment added", student });
+  } catch (err) {
+    res.status(500).json({ error: err });
+  }
 };
