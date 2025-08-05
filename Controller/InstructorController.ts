@@ -1,163 +1,126 @@
 import { Request, Response } from 'express';
 import Instructor from '../Schemas/instructor';
-import CourseModel from '../Schemas/course';
+import { InstructorService } from '../Services/InstructorService';
 
-// GET /instructors- Get all instructors 
+const instructorService = new InstructorService();
+
+// GET / - Get all instructors
 export const getInstructors = async (req: Request, res: Response) => {
   try {
-    const instructor = await Instructor.find();
-    if (!instructor) return res.status(404).json({ message: 'No Instructors found' });
-    res.status(200).json(instructor);
-  } catch (err) {
-    res.status(500).json({ message: err });
+    const instructors = await instructorService.getAllInstructors();
+    if (instructors.length === 0) {
+      return res.status(404).json({ message: 'No instructors found' });
+    }
+    res.status(200).json(instructors);
+  } catch (error) {
+    console.error('Instructors error:', error);
+    res.status(500).json({ message: 'Internal server error' });
   }
 };
 
-// GET /instructors/:id - Get instructor profile
+// GET /:id - Get instructor by ID
 export const getInstructorById = async (req: Request, res: Response) => {
   try {
-    const instructor = await Instructor.findById(req.params.id);
-    if (!instructor) return res.status(404).json({ message: 'Instructor not found' });
-    res.json(instructor);
-  } catch (err) {
-    res.status(500).json({ message: err });
+    const instructor = await instructorService.getInstructorById(req.params.id);
+    if (!instructor) {
+      return res.status(404).json({ message: 'Instructor not found' });
+    }
+    res.status(200).json(instructor);
+  } catch (error) {
+    console.error('Instructor error:', error);
+    res.status(500).json({ message: 'Internal server error' });
   }
 };
 
-// GET /instructors?search=alex
+// GET /search - Search instructors
 export const searchInstructors = async (req: Request, res: Response) => {
   try {
-    const search = req.query.search || "";
-    const lecturers = await Instructor.find({
-      name: { $regex: search, $options: "i" } 
+    const search = req.query.search || '';
+    const instructors = await Instructor.find({
+      name: { $regex: search, $options: 'i' }
     });
-
-    res.status(200).json(lecturers);
-  } catch (err) {
-    console.error("Error fetching lecturers", err);
-    res.status(500).json({ message: "Server error" });
+    res.status(200).json(instructors);
+  } catch (error) {
+    console.error('Search error:', error);
+    res.status(500).json({ message: 'Internal server error' });
   }
 };
 
-
-// GET /instructors/:id/courses - Courses taught by instructor
+// GET /:id/courses - Get instructor's courses
 export const getInstructorCourses = async (req: Request, res: Response) => {
   try {
-    const instructor = await Instructor.findById(req.params.id);
-    if (!instructor) return res.status(404).json({ message: 'Instructor not found' });
-    res.json(instructor.coursesTaught);
-  } catch (err) {
-    res.status(500).json({ message: err });
+    const courses = await instructorService.getInstructorCourses(req.params.id);
+    res.status(200).json(courses);
+  } catch (error) {
+    console.error('Courses error:', error);
+    res.status(500).json({ message: 'Internal server error' });
   }
 };
 
-// POST /instructors - Add new instructor (admin only)
+// POST / - Create new instructor
 export const addInstructor = async (req: Request, res: Response) => {
   try {
-    const instructor = new Instructor(req.body);
-    if(instructor.coursesTaught.length > 0) {
-      for(const course of instructor.coursesTaught) {
-        const courseModel = await CourseModel.findById(course.courseId)
-        if(!courseModel) {
-          return res.status(404).json({ message: `Course with ID ${course.courseId} not found` });
-        }
-        const instructorExists = courseModel.instructors.find((i: any) => String(i.id) === String(instructor._id));
-        console.log(instructorExists)
-        if (!instructorExists) {
-          console.log(course)
-          courseModel.instructors.push({
-            id: instructor._id,
-            name: instructor.name,
-            email: instructor.email,
-            phoneNumber: instructor.phoneNumber, 
-          });
-      }
-        await courseModel.save();
-      }
-    }
-    await instructor.save();
+    const instructor = await instructorService.createInstructor(req.body);
     res.status(201).json(instructor);
-  } catch (err) {
-    res.status(400).json({ message: err });
+  } catch (error) {
+    console.error('Instructor creation error:', error);
+    res.status(500).json({ message: 'Internal server error' });
   }
 };
 
-// PUT /instructors/:id - Update info
+// PUT /:id - Update instructor
 export const updateInstructor = async (req: Request, res: Response) => {
   try {
-    const updated = await Instructor.findByIdAndUpdate(req.params.id, req.body, { new: true });
-    if (!updated) return res.status(404).json({ message: 'Instructor not found' });
-    res.json(updated);
-  } catch (err) {
-    res.status(400).json({ message: err });
+    const updated = await instructorService.updateInstructor(req.params.id, req.body);
+    if (!updated) {
+      return res.status(404).json({ message: 'Instructor not found' });
+    }
+    res.status(200).json(updated);
+  } catch (error) {
+    console.error('Update error:', error);
+    res.status(500).json({ message: 'Internal server error' });
   }
 };
 
-// POST /instructors/:id/add-course - Add a course to instructor's coursesTaught
+// POST /:id/add-course - Add course to instructor
 export const addCourseToInstructor = async (req: Request, res: Response) => {
   try {
+    const { id: courseId } = req.params;
     const { instructors } = req.body;
-    const course = await  CourseModel.findById(req.params.id);
-    if (!course) return res.status(404).json({ message: 'Course not found' });
-    
-    for(const instructor of instructors){
-      const instructorId = instructor.id;
-      const instructorModel = await Instructor.findById(instructorId)
-      if (instructorModel.coursesTaught.some((c: any) => c.courseId === course._id)) {
-        return res.status(400).json({ message: 'Course already assigned to instructor' });
-      }
-      const courseTaught = {
-        courseId:course._id, 
-        courseName:course.title,
-      }
-      const instructorDataModel = {
-        id:instructorModel._id,
-        name:instructorModel.name,
-        email:instructorModel.email,
-        phoneNumber:instructorModel.phoneNumber
-      }
-      instructorModel.coursesTaught.push(courseTaught);
-      course.instructors.push(instructorDataModel)
-      await instructorModel.save();
+
+    if (!Array.isArray(instructors) || instructors.length === 0) {
+      return res.status(400).json({ message: "Instructors list is required" });
     }
-    await course.save();
-    res.json({ message: 'Course added to instructor'});
-    } catch (err) {
-    res.status(400).json({ message: err instanceof Error ? err.message : err });
+
+    const result = await instructorService.addCourse(courseId, instructors);
+    res.status(200).json(result);
+  } catch (err) {
+    console.error("Add instructors error:", err);
+    res.status(500).json({ message: "Internal server error" });
   }
 };
 
-// POST /instructors/:id/remove-course - Remove a course from instructor's coursesTaught
+// POST /:id/remove-course - Remove course from instructor
 export const removeCourseFromInstructor = async (req: Request, res: Response) => {
   try {
-    const { courseId } = req.body;
-    const instructor = await Instructor.findById(req.params.id);
-    if (!instructor) return res.status(404).json({ message: 'Instructor not found' });
-
-    const initialLength = instructor.coursesTaught.length;
-    instructor.coursesTaught = instructor.coursesTaught.filter((c: any) => c.courseId !== courseId);
-    if (instructor.coursesTaught.length === initialLength) {
-      return res.status(404).json({ message: 'Course not found in instructor\'s coursesTaught' });
-    }
-    const courseModel = await CourseModel.findById(req.body.courseId);
-    console.log(courseModel.instructors,instructor.id)
-    courseModel.instructors = courseModel.instructors.filter((c:any) => c.id != instructor.id);
-    await courseModel.save();
-    await instructor.save();
-    res.json({ message: 'Course removed from instructor', coursesTaught: instructor.coursesTaught });
-  } catch (err) {
-    res.status(400).json({ message: err });
+    const instructor = await instructorService.removeCourse(req.params.id, req.body.courseId);
+    res.status(200).json(instructor);
+  } catch (error) {
+    console.error('Remove course error:', error);
+    res.status(500).json({ message: 'Internal server error' });
   }
 };
 
-// DELETE /instructors/:id - Delete an instructor
+// DELETE /:id - Delete instructor
 export const deleteInstructor = async (req: Request, res: Response) => {
   try {
-    console.log("Deleting instructor with ID:", req.params.id);
-    const deleted = await Instructor.findByIdAndDelete(req.params.id);
-    if (!deleted) return res.status(404).json({ message: 'Instructor not found' });
-    res.status(200).json({ message: 'Instructor deleted successfully.' });
-  } catch (err) {
-    res.status(500).json({ message: err });
+    const deleted = await instructorService.deleteInstructor(req.params.id);
+    if (!deleted) {
+      return res.status(404).json({ message: 'Instructor not found' });
+    }
+    res.status(200).json({ message: 'Instructor deleted successfully' });
+  } catch (error) {
+    console.error('Delete error:', error);
+    res.status(500).json({ message: 'Internal server error' });
   }
-}
+};

@@ -12,12 +12,10 @@ const instructorSchema = mongoose.Schema({
     email: {
         type: String,
         required: true,
-        unique: true        
     },
     phoneNumber: {  
         type: Number,
         required: true,
-        unique: true
     }
 })
 
@@ -34,12 +32,10 @@ const studentsSchema = mongoose.Schema({
     email: {
         type: String,
         required: true,
-        unique: true        
     },
     phoneNumber: {  
         type: Number,
         required: true,
-        unique: true
     }
 })
 

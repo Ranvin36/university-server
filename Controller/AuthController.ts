@@ -29,6 +29,7 @@ const getToken = async (user:any,pass:any) => {
 export const loginUser = async(req:Request, res:Response) => {
   try{
         const {username, password} = req.body;
+        console.log(username,password)
         const token = await getToken(username, password);
         res.json({ message: "Login endpoint is under construction" , token: token });
     }
