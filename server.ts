@@ -5,8 +5,6 @@ import studentsRouter from './Routes/StudentRoutes';
 import connectDatabase from './utils/Database';
 import courseRouter from './Routes/CourseRouter';
 import instructorRouter from './Routes/InstructorRoutes';
-import gradesRouter from './Routes/GradesRoutes';
-import paymentRouter from './Routes/PaymentRoutes';
 import cors from 'cors'
 import authRouter from './Routes/AuthRouter';
 
@@ -26,8 +24,6 @@ app.use('/university/v1/api/auth',authRouter)
 app.use('/university/v1/api/students', studentsRouter);
 app.use('/university/v1/api/courses', courseRouter);
 app.use('/university/v1/api/instructors', instructorRouter);
-app.use('/university/v1/api/grades', gradesRouter);
-app.use('/university/v1/api/payments', paymentRouter);
 
 server.listen(5000, () => {
     console.log('Server is running on http://localhost:5000');
